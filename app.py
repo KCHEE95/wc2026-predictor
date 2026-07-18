@@ -70,19 +70,25 @@ if not OPENWEATHER_API_KEY:
 
 # ============== 裁判数据库（赛前手动更新此代码后重新部署）=============
 REFEREE_DATA = {
-    "103": {
-        "main": {"name": "待FIFA公布", "country": "", "style": "未知", "cards_per_game": 3.5},
-        "var": {"name": "待FIFA公布", "country": ""},
-        "assistant_1": {"name": "待公布", "country": ""},
-        "assistant_2": {"name": "待公布", "country": ""},
-        "notes": "FIFA通常在赛前48小时公布裁判组。2022决赛主裁：Szymon Marciniak（波兰）"
+    "103": {  # 🥉 季军赛 7月18日: France vs England
+        "main": {"name": "Jesús Valenzuela", "country": "Venezuela", "style": "严格", "cards_per_game": 4.8},
+        "assistant_1": {"name": "Jorge Urrego", "country": "Venezuela"},
+        "assistant_2": {"name": "Tulio Moreno", "country": "Venezuela"},
+        "fourth": {"name": "Jalal Jayed", "country": "Morocco"},
+        "reserve": {"name": "Zakaria Brinsi", "country": "Morocco"},
+        "var": {"name": "Leodán González", "country": "Uruguay"},
+        "avar": {"name": "Armando Villarreal", "country": "USA"},
+        "notes": "⚠️ Valenzuela执法风格严格，场均出牌4.8张，对英格兰和法国的激烈对抗需重点关注"
     },
-    "104": {
-        "main": {"name": "待FIFA公布", "country": "", "style": "未知", "cards_per_game": 3.5},
-        "var": {"name": "待FIFA公布", "country": ""},
-        "assistant_1": {"name": "待公布", "country": ""},
-        "assistant_2": {"name": "待公布", "country": ""},
-        "notes": "FIFA通常在赛前48小时公布裁判组"
+    "104": {  # 🏆 决赛 7月19日: Spain vs Argentina
+        "main": {"name": "Slavko Vinčić", "country": "Slovenia", "style": "均衡", "cards_per_game": 3.2},
+        "assistant_1": {"name": "Tomaž Klančnik", "country": "Slovenia"},
+        "assistant_2": {"name": "Andraž Kovačič", "country": "Slovenia"},
+        "fourth": {"name": "Adham Makhadmeh", "country": "Jordan"},
+        "reserve": {"name": "Mohammad Al-Kalaf", "country": "Jordan"},
+        "var": {"name": "Bastian Dankert", "country": "Germany"},
+        "avar": {"name": "Nicolás Gallo", "country": "Colombia"},
+        "notes": "✅ Vinčić执法风格均衡，2022世界杯经验丰富，适合控制西班牙vs阿根廷的技术流对决"
     }
 }
 
@@ -103,11 +109,11 @@ STADIUM_COORDS = {
 
 # ============== 球队基础能力值（可根据小组赛表现动态调整）=============
 TEAM_STATS = {
-    "Argentina": {"attack": 92, "defense": 88, "midfield": 90, "form": 0.85, "continent": "South America", "titles": 3, "flag": "🇦🇷"},
-    "France": {"attack": 91, "defense": 89, "midfield": 88, "form": 0.82, "continent": "Europe", "titles": 2, "flag": "🇫🇷"},
+    "Argentina": {"attack": 93, "defense": 89, "midfield": 91, "form": 0.88, "continent": "South America", "titles": 3, "flag": "🇦🇷"},
+    "France": {"attack": 91, "defense": 88, "midfield": 87, "form": 0.80, "continent": "Europe", "titles": 2, "flag": "🇫🇷"},
     "Brazil": {"attack": 90, "defense": 85, "midfield": 87, "form": 0.80, "continent": "South America", "titles": 5, "flag": "🇧🇷"},
-    "England": {"attack": 88, "defense": 87, "midfield": 86, "form": 0.78, "continent": "Europe", "titles": 1, "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿"},
-    "Spain": {"attack": 89, "defense": 86, "midfield": 91, "form": 0.83, "continent": "Europe", "titles": 1, "flag": "🇪🇸"},
+    "England": {"attack": 89, "defense": 88, "midfield": 87, "form": 0.81, "continent": "Europe", "titles": 1, "flag": "🏴󠁧󠁢󠁥󠁮󠁧󠁿"},
+    "Spain": {"attack": 91, "defense": 87, "midfield": 93, "form": 0.90, "continent": "Europe", "titles": 1, "flag": "🇪🇸"},
     "Germany": {"attack": 87, "defense": 85, "midfield": 88, "form": 0.75, "continent": "Europe", "titles": 4, "flag": "🇩🇪"},
     "Portugal": {"attack": 88, "defense": 84, "midfield": 85, "form": 0.76, "continent": "Europe", "titles": 0, "flag": "🇵🇹"},
     "Netherlands": {"attack": 86, "defense": 88, "midfield": 85, "form": 0.77, "continent": "Europe", "titles": 0, "flag": "🇳🇱"},
