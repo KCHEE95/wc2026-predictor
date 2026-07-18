@@ -1,13 +1,13 @@
+# 绝对不能提交到GitHub的文件
+.streamlit/secrets.toml
+.env
+*.key
+
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-.env
 .venv/
 venv/
-
-# Streamlit
-.streamlit/secrets.toml
 
 # IDE
 .vscode/
