@@ -1,5 +1,5 @@
 """
-🏆 2026 FIFA World Cup Final & Third Place Match Predictor
+2026 FIFA World Cup Final & Third Place Match Predictor
 Real-time data: worldcup26.ir API + OpenWeather + Referee Database
 Deploy: GitHub + Streamlit Community Cloud
 """
@@ -14,7 +14,7 @@ from datetime import datetime
 
 # ============== Page Config ==============
 st.set_page_config(
-    page_title="🏆 2026 World Cup Predictor",
+    page_title="2026 World Cup Predictor",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -73,7 +73,7 @@ if not OPENWEATHER_API_KEY:
 
 # ============== Referee Database (UPDATE BEFORE MATCH DAY) ==============
 REFEREE_DATA = {
-    "103": {  # 🥉 Third Place Match - July 18: France vs England
+    "103": {  # Third Place Match - July 18: France vs England
         "main": {"name": "Jesús Valenzuela", "country": "Venezuela", "style": "Strict", "cards_per_game": 4.8},
         "assistant_1": {"name": "Jorge Urrego", "country": "Venezuela"},
         "assistant_2": {"name": "Tulio Moreno", "country": "Venezuela"},
@@ -81,9 +81,9 @@ REFEREE_DATA = {
         "reserve": {"name": "Zakaria Brinsi", "country": "Morocco"},
         "var": {"name": "Leodán González", "country": "Uruguay"},
         "avar": {"name": "Armando Villarreal", "country": "USA"},
-        "notes": "⚠️ Valenzuela has a strict style (4.8 cards/game). France vs England could see many bookings."
+        "notes": "Valenzuela has a strict style (4.8 cards/game). France vs England could see many bookings."
     },
-    "104": {  # 🏆 Final - July 19: Spain vs Argentina
+    "104": {  # Final - July 19: Spain vs Argentina
         "main": {"name": "Slavko Vinčić", "country": "Slovenia", "style": "Balanced", "cards_per_game": 3.2},
         "assistant_1": {"name": "Tomaž Klančnik", "country": "Slovenia"},
         "assistant_2": {"name": "Andraž Kovačič", "country": "Slovenia"},
@@ -91,7 +91,7 @@ REFEREE_DATA = {
         "reserve": {"name": "Mohammad Al-Kalaf", "country": "Jordan"},
         "var": {"name": "Bastian Dankert", "country": "Germany"},
         "avar": {"name": "Nicolás Gallo", "country": "Colombia"},
-        "notes": "✅ Vinčić is balanced and experienced (2022 World Cup final). Perfect for Spain vs Argentina technical battle."
+        "notes": "Vinčić is balanced and experienced (2022 World Cup final). Perfect for Spain vs Argentina technical battle."
     }
 }
 
@@ -142,7 +142,6 @@ def get_knockout_matches():
     """Get knockout stage matches. Returns empty list if API fails."""
     data = fetch_wc_api("/get/games")
 
-    # Handle API errors or missing data
     if not isinstance(data, dict):
         return []
     if "error" in data:
@@ -159,7 +158,6 @@ def get_all_teams():
     """Get all teams. Returns empty dict if API fails."""
     data = fetch_wc_api("/get/teams")
 
-    # FIX: API returns {"teams": [...]} not direct list
     if not isinstance(data, dict):
         return {}
     if "error" in data:
@@ -181,7 +179,6 @@ def get_all_stadiums():
     if "error" in data:
         return {}
 
-    # API might return list or dict with "stadiums" key
     if isinstance(data, list):
         return {s.get("id"): s for s in data if isinstance(s, dict)}
 
@@ -257,7 +254,6 @@ class MatchPredictor:
         wind = self.weather.get("wind_speed", 5)
         weather_main = self.weather.get("weather_main", "Clear")
 
-        # Temperature effects
         if temp > 30:
             if team.get("continent") == "South America":
                 w["form"] *= 1.06
@@ -269,21 +265,17 @@ class MatchPredictor:
             else:
                 w["form"] *= 0.96
 
-        # High humidity
         if humidity > 80:
             w["form"] *= 0.97
 
-        # Strong wind
         if wind > 12:
             w["midfield"] *= 0.96
             w["attack"] *= 0.97
 
-        # Rain
         if weather_main in ["Rain", "Thunderstorm"]:
             w["attack"] *= 0.95
             w["defense"] *= 1.02
 
-        # Referee style
         ref_style = self.referee.get("main", {}).get("style", "Balanced")
         if ref_style == "Loose":
             w["defense"] *= 1.03
@@ -353,7 +345,6 @@ def render_match_card(match, teams_db, stadiums_db, match_type_label):
     stadium = stadiums_db.get(stadium_id, {}) if isinstance(stadiums_db, dict) else {}
     stadium_name = stadium.get("name_en", "Unknown Stadium")
 
-    # Status
     if finished:
         status_emoji, status_class, status_text = "✅", "status-finished", "Finished"
         is_live = False
@@ -370,7 +361,6 @@ def render_match_card(match, teams_db, stadiums_db, match_type_label):
     home_stats = TEAM_STATS.get(home, {"flag": "🏳️", "titles": 0})
     away_stats = TEAM_STATS.get(away, {"flag": "🏳️", "titles": 0})
 
-    # Match header
     st.markdown(f"""
     <div class="match-card">
         <div style="font-size:1rem; opacity:0.8; margin-bottom:0.5rem;">
@@ -394,7 +384,6 @@ def render_match_card(match, teams_db, stadiums_db, match_type_label):
     </div>
     """, unsafe_allow_html=True)
 
-    # Info cards
     info_cols = st.columns(3)
 
     with info_cols[0]:
@@ -430,7 +419,6 @@ def render_match_card(match, teams_db, stadiums_db, match_type_label):
             st.write(f"🌍 {ref_main['country']}")
         st.write(f"Style: {ref_main.get('style', 'Unknown')} ({ref_main.get('cards_per_game', '?')} cards/game)")
 
-        # Show VAR
         var = referee.get("var", {})
         if var.get("name") and var["name"] != "TBA":
             st.write(f"VAR: {var['name']} ({var.get('country', '')})")
@@ -439,7 +427,6 @@ def render_match_card(match, teams_db, stadiums_db, match_type_label):
             st.caption(f"ℹ️ {referee['notes']}")
         st.markdown("</div>", unsafe_allow_html=True)
 
-    # Prediction (only for upcoming matches)
     if not is_live and not finished and home != "TBD" and away != "TBD":
         st.markdown("---")
         st.markdown("### 🔮 AI Prediction Analysis")
@@ -457,7 +444,6 @@ def render_match_card(match, teams_db, stadiums_db, match_type_label):
             st.metric(f"{away} Win", f"{result['win_b']*100:.1f}%",
                      delta=f"xG: {result['exp_goals_b']:.2f}")
 
-        # Top scores
         top = result["top_scores"][:5]
         st.markdown("#### 📊 Most Likely Scorelines")
         score_cols = st.columns(5)
@@ -471,7 +457,6 @@ def render_match_card(match, teams_db, stadiums_db, match_type_label):
                 </div>
                 """, unsafe_allow_html=True)
 
-        # Champion prediction for final
         if match_type_label == "🏆 Final":
             champion = home if result["win_a"] > result["win_b"] else away
             champion_prob = max(result["win_a"], result["win_b"])
@@ -530,25 +515,25 @@ def main():
 
         st.markdown("### 📅 Schedule")
         st.info("""
-        🥉 Third Place
-        July 18, 15:00 UTC
-        Hard Rock Stadium, Miami
+🥉 Third Place
+July 18, 15:00 UTC
+Hard Rock Stadium, Miami
 
-        🏆 Final
-        July 19, 15:00 UTC
-        MetLife Stadium, New Jersey
+🏆 Final
+July 19, 15:00 UTC
+MetLife Stadium, New Jersey
         """)
 
         st.markdown("---")
         st.markdown("### 📝 About")
         st.caption("""
-        Data Sources:
-        • worldcup26.ir (match data)
-        • OpenWeatherMap (weather)
-        • FIFA Official (referees)
+Data Sources:
+• worldcup26.ir (match data)
+• OpenWeatherMap (weather)
+• FIFA Official (referees)
 
-        Model: Monte Carlo (20,000 sims)
-        with dynamic situational weights
+Model: Monte Carlo (20,000 sims)
+with dynamic situational weights
         """)
 
     tab1, tab2, tab3 = st.tabs(["🔮 Match Predictions", "📊 Team Analysis", "⚙️ System Info"])
@@ -571,7 +556,6 @@ def main():
             with c2:
                 away = st.selectbox("Team B", [t for t in all_teams if t != home], key="manual_away")
 
-            # Manual weather selection
             weather_option = st.selectbox("Weather Condition", [
                 "Clear (22°C)", "Hot (35°C)", "Cold (5°C)", "Rainy (18°C)", "Windy (20°C)"
             ])
@@ -730,13 +714,13 @@ def main():
 
         st.markdown("### 🚀 Deployment Guide")
         st.info("""
-        **Steps:**
-        1. Create public GitHub repo `wc2026-predictor`
-        2. Upload all project files
-        3. Go to share.streamlit.io → Sign in with GitHub
-        4. Click New app → Select repo → Main file: `app.py`
-        5. Settings → Secrets → Add OPENWEATHER_API_KEY
-        6. Click Deploy!
+Steps:
+1. Create public GitHub repo `wc2026-predictor`
+2. Upload all project files
+3. Go to share.streamlit.io → Sign in with GitHub
+4. Click New app → Select repo → Main file: `app.py`
+5. Settings → Secrets → Add OPENWEATHER_API_KEY
+6. Click Deploy!
         """)
 
         st.markdown("### 📝 How to Update Referee Data")
@@ -746,9 +730,9 @@ def main():
 # 3. Streamlit Cloud auto-redeploys
 
 git add app.py
-git commit -m "Update referee: Final - Vinčić, 3rd - Valenzuela"
+git commit -m "Update referee: Final - Vincic, 3rd - Valenzuela"
 git push origin main
-        "", language="bash")
+        """, language="bash")
 
 if __name__ == "__main__":
     main()
