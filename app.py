@@ -1,8 +1,7 @@
 """
 🏆 2026 FIFA World Cup Final & Third Place Match Predictor
-实时数据版 - 集成 worldcup26.ir API + OpenWeather + 裁判数据
-
-部署方式: GitHub + Streamlit Community Cloud
+Real-time data: worldcup26.ir API + OpenWeather + Referee Database
+Deploy: GitHub + Streamlit Community Cloud
 """
 
 import streamlit as st
@@ -12,17 +11,16 @@ import random
 import numpy as np
 import pandas as pd
 from datetime import datetime
-from functools import lru_cache
 
-# ============== 页面配置 ==============
+# ============== Page Config ==============
 st.set_page_config(
-    page_title="🏆 2026世界杯实时预测系统",
+    page_title="🏆 2026 World Cup Predictor",
     page_icon="⚽",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ============== 自定义CSS ==============
+# ============== Custom CSS ==============
 st.markdown("""
 <style>
     .main-header {
@@ -56,43 +54,48 @@ st.markdown("""
     .status-live { color: #e74c3c; font-weight: bold; }
     .status-upcoming { color: #3498db; }
     .status-finished { color: #2ecc71; }
+    .referee-card {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        color: white; border-radius: 15px; padding: 1rem;
+        margin-bottom: 0.5rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ============== API 配置 ==============
+# ============== API Config ==============
 WC_API_BASE = "https://worldcup26.ir"
 
-# 从 Streamlit Secrets 读取 API Key（本地开发回退到环境变量）
+# Read API Key from Streamlit Secrets (fallback to env var for local dev)
 OPENWEATHER_API_KEY = st.secrets.get("OPENWEATHER_API_KEY", "")
 if not OPENWEATHER_API_KEY:
     import os
     OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "")
 
-# ============== 裁判数据库（赛前手动更新此代码后重新部署）=============
+# ============== Referee Database (UPDATE BEFORE MATCH DAY) ==============
 REFEREE_DATA = {
-    "103": {  # 🥉 季军赛 7月18日: France vs England
-        "main": {"name": "Jesús Valenzuela", "country": "Venezuela", "style": "严格", "cards_per_game": 4.8},
+    "103": {  # 🥉 Third Place Match - July 18: France vs England
+        "main": {"name": "Jesús Valenzuela", "country": "Venezuela", "style": "Strict", "cards_per_game": 4.8},
         "assistant_1": {"name": "Jorge Urrego", "country": "Venezuela"},
         "assistant_2": {"name": "Tulio Moreno", "country": "Venezuela"},
         "fourth": {"name": "Jalal Jayed", "country": "Morocco"},
         "reserve": {"name": "Zakaria Brinsi", "country": "Morocco"},
         "var": {"name": "Leodán González", "country": "Uruguay"},
         "avar": {"name": "Armando Villarreal", "country": "USA"},
-        "notes": "⚠️ Valenzuela执法风格严格，场均出牌4.8张，对英格兰和法国的激烈对抗需重点关注"
+        "notes": "⚠️ Valenzuela has a strict style (4.8 cards/game). France vs England could see many bookings."
     },
-    "104": {  # 🏆 决赛 7月19日: Spain vs Argentina
-        "main": {"name": "Slavko Vinčić", "country": "Slovenia", "style": "均衡", "cards_per_game": 3.2},
+    "104": {  # 🏆 Final - July 19: Spain vs Argentina
+        "main": {"name": "Slavko Vinčić", "country": "Slovenia", "style": "Balanced", "cards_per_game": 3.2},
         "assistant_1": {"name": "Tomaž Klančnik", "country": "Slovenia"},
         "assistant_2": {"name": "Andraž Kovačič", "country": "Slovenia"},
         "fourth": {"name": "Adham Makhadmeh", "country": "Jordan"},
         "reserve": {"name": "Mohammad Al-Kalaf", "country": "Jordan"},
         "var": {"name": "Bastian Dankert", "country": "Germany"},
         "avar": {"name": "Nicolás Gallo", "country": "Colombia"},
-        "notes": "✅ Vinčić执法风格均衡，2022世界杯经验丰富，适合控制西班牙vs阿根廷的技术流对决"
+        "notes": "✅ Vinčić is balanced and experienced (2022 World Cup final). Perfect for Spain vs Argentina technical battle."
     }
 }
 
-# ============== 球场坐标（用于天气查询）=============
+# ============== Stadium Coordinates (for weather) ==============
 STADIUM_COORDS = {
     "MetLife Stadium": {"lat": 40.8135, "lon": -74.0745, "city": "East Rutherford", "country": "USA"},
     "Hard Rock Stadium": {"lat": 25.9580, "lon": -80.2389, "city": "Miami Gardens", "country": "USA"},
@@ -107,7 +110,7 @@ STADIUM_COORDS = {
     "Estadio Akron": {"lat": 20.6818, "lon": -103.4625, "city": "Guadalajara", "country": "Mexico"},
 }
 
-# ============== 球队基础能力值（可根据小组赛表现动态调整）=============
+# ============== Team Stats (updated after semifinals) ==============
 TEAM_STATS = {
     "Argentina": {"attack": 93, "defense": 89, "midfield": 91, "form": 0.88, "continent": "South America", "titles": 3, "flag": "🇦🇷"},
     "France": {"attack": 91, "defense": 88, "midfield": 87, "form": 0.80, "continent": "Europe", "titles": 2, "flag": "🇫🇷"},
@@ -121,11 +124,11 @@ TEAM_STATS = {
     "Belgium": {"attack": 86, "defense": 83, "midfield": 85, "form": 0.73, "continent": "Europe", "titles": 0, "flag": "🇧🇪"},
 }
 
-# ============== 数据获取层 ==============
+# ============== Data Fetching Layer (with robust error handling) ==============
 
 @st.cache_data(ttl=300)
 def fetch_wc_api(endpoint):
-    """调用 worldcup26.ir API"""
+    """Call worldcup26.ir API with error handling"""
     try:
         url = f"{WC_API_BASE}{endpoint}"
         resp = requests.get(url, timeout=10)
@@ -136,32 +139,61 @@ def fetch_wc_api(endpoint):
 
 @st.cache_data(ttl=60)
 def get_knockout_matches():
-    """获取淘汰赛阶段比赛"""
+    """Get knockout stage matches. Returns empty list if API fails."""
     data = fetch_wc_api("/get/games")
+
+    # Handle API errors or missing data
+    if not isinstance(data, dict):
+        return []
+    if "error" in data:
+        return []
     if "games" not in data:
         return []
-    knockout = [g for g in data["games"] if g.get("type") in ["sf", "third", "final"]]
-    return sorted(knockout, key=lambda x: int(x.get("id", 0)))
+
+    knockout_types = ["sf", "third", "final"]
+    matches = [g for g in data["games"] if g.get("type") in knockout_types]
+    return sorted(matches, key=lambda x: int(x.get("id", 0)))
 
 @st.cache_data(ttl=600)
 def get_all_teams():
-    """获取全部球队"""
+    """Get all teams. Returns empty dict if API fails."""
     data = fetch_wc_api("/get/teams")
-    if not data:
+
+    # FIX: API returns {"teams": [...]} not direct list
+    if not isinstance(data, dict):
         return {}
-    return {t.get("name_en", ""): t for t in data}
+    if "error" in data:
+        return {}
+
+    teams_list = data.get("teams", [])
+    if not isinstance(teams_list, list):
+        return {}
+
+    return {t.get("name_en", ""): t for t in teams_list if isinstance(t, dict)}
 
 @st.cache_data(ttl=600)
 def get_all_stadiums():
-    """获取全部球场"""
+    """Get all stadiums. Returns empty dict if API fails."""
     data = fetch_wc_api("/get/stadiums")
-    if not data:
+
+    if not isinstance(data, dict):
         return {}
-    return {s.get("id"): s for s in data}
+    if "error" in data:
+        return {}
+
+    # API might return list or dict with "stadiums" key
+    if isinstance(data, list):
+        return {s.get("id"): s for s in data if isinstance(s, dict)}
+
+    stadiums_list = data.get("stadiums", [])
+    if isinstance(stadiums_list, list):
+        return {s.get("id"): s for s in stadiums_list if isinstance(s, dict)}
+
+    return {}
 
 @st.cache_data(ttl=1800)
 def get_weather(stadium_name, match_date=None):
-    """获取比赛日天气"""
+    """Get match day weather. Returns None if no API key or error."""
     if not OPENWEATHER_API_KEY:
         return None
 
@@ -179,6 +211,10 @@ def get_weather(stadium_name, match_date=None):
         }
         r = requests.get(url, params=params, timeout=8)
         d = r.json()
+
+        if d.get("cod") not in [200, "200"]:
+            return None
+
         return {
             "temperature": d["main"]["temp"],
             "feels_like": d["main"]["feels_like"],
@@ -197,7 +233,7 @@ def get_weather(stadium_name, match_date=None):
     except Exception:
         return None
 
-# ============== 预测引擎 ==============
+# ============== Prediction Engine ==============
 
 class MatchPredictor:
     def __init__(self, team_a_name, team_b_name, weather=None, referee=None):
@@ -209,11 +245,11 @@ class MatchPredictor:
         self.team_a = TEAM_STATS.get(team_a_name, {"attack": 80, "defense": 80, "midfield": 80, "form": 0.70, "continent": "", "titles": 0, "flag": "🏳️"})
         self.team_b = TEAM_STATS.get(team_b_name, {"attack": 80, "defense": 80, "midfield": 80, "form": 0.70, "continent": "", "titles": 0, "flag": "🏳️"})
 
-        self.weights_a = self._calc_weights(self.team_a, True)
-        self.weights_b = self._calc_weights(self.team_b, False)
+        self.weights_a = self._calc_weights(self.team_a)
+        self.weights_b = self._calc_weights(self.team_b)
 
-    def _calc_weights(self, team, is_home):
-        """根据情境计算战力权重"""
+    def _calc_weights(self, team):
+        """Calculate situational strength weights"""
         w = {"attack": 1.0, "defense": 1.0, "midfield": 1.0, "form": 1.0}
 
         temp = self.weather.get("temperature", 22)
@@ -221,6 +257,7 @@ class MatchPredictor:
         wind = self.weather.get("wind_speed", 5)
         weather_main = self.weather.get("weather_main", "Clear")
 
+        # Temperature effects
         if temp > 30:
             if team.get("continent") == "South America":
                 w["form"] *= 1.06
@@ -232,21 +269,25 @@ class MatchPredictor:
             else:
                 w["form"] *= 0.96
 
+        # High humidity
         if humidity > 80:
             w["form"] *= 0.97
 
+        # Strong wind
         if wind > 12:
             w["midfield"] *= 0.96
             w["attack"] *= 0.97
 
+        # Rain
         if weather_main in ["Rain", "Thunderstorm"]:
             w["attack"] *= 0.95
             w["defense"] *= 1.02
 
-        ref_style = self.referee.get("main", {}).get("style", "均衡")
-        if ref_style == "宽松":
+        # Referee style
+        ref_style = self.referee.get("main", {}).get("style", "Balanced")
+        if ref_style == "Loose":
             w["defense"] *= 1.03
-        elif ref_style == "严格":
+        elif ref_style == "Strict":
             w["defense"] *= 0.97
 
         return w
@@ -265,7 +306,6 @@ class MatchPredictor:
 
         wins_a = wins_b = draws = 0
         scores = {}
-        goals_a, goals_b = [], []
 
         for _ in range(n):
             actual_a = s_a + random.gauss(0, 11)
@@ -276,9 +316,6 @@ class MatchPredictor:
 
             g_a = np.random.poisson(lam_a)
             g_b = np.random.poisson(lam_b)
-
-            goals_a.append(g_a)
-            goals_b.append(g_b)
 
             key = f"{g_a}-{g_b}"
             scores[key] = scores.get(key, 0) + 1
@@ -295,34 +332,36 @@ class MatchPredictor:
             "win_a": wins_a / total,
             "win_b": wins_b / total,
             "draw": draws / total,
-            "exp_goals_a": np.mean(goals_a),
-            "exp_goals_b": np.mean(goals_b),
+            "exp_goals_a": sum([int(k.split("-")[0]) * v for k, v in scores.items()]) / total,
+            "exp_goals_b": sum([int(k.split("-")[1]) * v for k, v in scores.items()]) / total,
             "top_scores": sorted(scores.items(), key=lambda x: x[1], reverse=True)[:8],
         }
 
-# ============== 主界面 ==============
+# ============== UI Components ==============
 
 def render_match_card(match, teams_db, stadiums_db, match_type_label):
-    match_id = match.get("id", "")
+    """Render a single match card with prediction"""
+    match_id = str(match.get("id", ""))
     home = match.get("home_team_name_en", "TBD")
     away = match.get("away_team_name_en", "TBD")
     home_score = match.get("home_score", "0")
     away_score = match.get("away_score", "0")
     status = match.get("time_elapsed", "notstarted")
-    finished = match.get("finished", "FALSE") == "TRUE"
+    finished = str(match.get("finished", "FALSE")).upper() == "TRUE"
 
     stadium_id = match.get("stadium_id")
-    stadium = stadiums_db.get(stadium_id, {})
-    stadium_name = stadium.get("name_en", "未知球场")
+    stadium = stadiums_db.get(stadium_id, {}) if isinstance(stadiums_db, dict) else {}
+    stadium_name = stadium.get("name_en", "Unknown Stadium")
 
+    # Status
     if finished:
-        status_emoji, status_class, status_text = "✅", "status-finished", "已结束"
+        status_emoji, status_class, status_text = "✅", "status-finished", "Finished"
         is_live = False
     elif status == "live":
-        status_emoji, status_class, status_text = "🔴", "status-live", "进行中"
+        status_emoji, status_class, status_text = "🔴", "status-live", "LIVE"
         is_live = True
     else:
-        status_emoji, status_class, status_text = "⏳", "status-upcoming", "未开始"
+        status_emoji, status_class, status_text = "⏳", "status-upcoming", "Upcoming"
         is_live = False
 
     weather = get_weather(stadium_name, match.get("local_date", ""))
@@ -331,6 +370,7 @@ def render_match_card(match, teams_db, stadiums_db, match_type_label):
     home_stats = TEAM_STATS.get(home, {"flag": "🏳️", "titles": 0})
     away_stats = TEAM_STATS.get(away, {"flag": "🏳️", "titles": 0})
 
+    # Match header
     st.markdown(f"""
     <div class="match-card">
         <div style="font-size:1rem; opacity:0.8; margin-bottom:0.5rem;">
@@ -354,63 +394,72 @@ def render_match_card(match, teams_db, stadiums_db, match_type_label):
     </div>
     """, unsafe_allow_html=True)
 
+    # Info cards
     info_cols = st.columns(3)
 
     with info_cols[0]:
         st.markdown("<div class='info-card'>", unsafe_allow_html=True)
-        st.markdown("**🏟️ 球场信息**")
-        st.write(f"📍 {stadium.get('city_en', '未知')}, {stadium.get('country_en', '')}")
+        st.markdown("**🏟️ Stadium**")
+        st.write(f"📍 {stadium.get('city_en', 'Unknown')}, {stadium.get('country_en', '')}")
         cap = stadium.get('capacity')
         if cap:
-            st.write(f"👥 容量: {int(cap):,}人")
+            st.write(f"👥 Capacity: {int(cap):,}")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with info_cols[1]:
         st.markdown("<div class='info-card'>", unsafe_allow_html=True)
-        st.markdown("**🌤️ 天气实况**")
+        st.markdown("**🌤️ Weather**")
         if weather:
-            st.write(f"🌡️ {weather['temperature']:.1f}°C (体感 {weather['feels_like']:.1f}°C)")
-            st.write(f"💧 湿度 {weather['humidity']}% | 💨 风速 {weather['wind_speed']:.1f}m/s")
-            st.write(f"☁️ {weather['weather']} | 👁️ 能见度 {weather['visibility']/1000:.1f}km")
+            st.write(f"🌡️ {weather['temperature']:.1f}°C (feels {weather['feels_like']:.1f}°C)")
+            st.write(f"💧 Humidity {weather['humidity']}% | 💨 Wind {weather['wind_speed']:.1f}m/s")
+            st.write(f"☁️ {weather['weather'].title()}")
         else:
             if OPENWEATHER_API_KEY:
-                st.write("🔄 加载中...")
+                st.write("🔄 Loading...")
             else:
-                st.write("⚠️ API Key 未配置")
-                st.caption("在 Streamlit Secrets 添加 OPENWEATHER_API_KEY")
+                st.write("⚠️ API Key not configured")
+                st.caption("Add OPENWEATHER_API_KEY in Streamlit Secrets")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with info_cols[2]:
-        st.markdown("<div class='info-card'>", unsafe_allow_html=True)
-        st.markdown("**👨‍⚖️ 裁判组**")
+        st.markdown("<div class='referee-card'>", unsafe_allow_html=True)
+        st.markdown("**👨‍⚖️ Referee Team**")
         ref_main = referee.get("main", {})
-        st.write(f"主裁: {ref_main.get('name', '待公布')}")
+        st.write(f"Referee: **{ref_main.get('name', 'TBA')}**")
         if ref_main.get("country"):
-            st.write(f"国籍: {ref_main['country']}")
-        st.write(f"风格: {ref_main.get('style', '未知')}")
+            st.write(f"🌍 {ref_main['country']}")
+        st.write(f"Style: {ref_main.get('style', 'Unknown')} ({ref_main.get('cards_per_game', '?')} cards/game)")
+
+        # Show VAR
+        var = referee.get("var", {})
+        if var.get("name") and var["name"] != "TBA":
+            st.write(f"VAR: {var['name']} ({var.get('country', '')})")
+
         if referee.get("notes"):
             st.caption(f"ℹ️ {referee['notes']}")
         st.markdown("</div>", unsafe_allow_html=True)
 
+    # Prediction (only for upcoming matches)
     if not is_live and not finished and home != "TBD" and away != "TBD":
         st.markdown("---")
-        st.markdown("### 🔮 AI 预测分析")
+        st.markdown("### 🔮 AI Prediction Analysis")
 
         predictor = MatchPredictor(home, away, weather, referee)
         result = predictor.simulate(20000)
 
         prob_cols = st.columns(3)
         with prob_cols[0]:
-            st.metric(f"{home} 获胜", f"{result['win_a']*100:.1f}%", 
-                     delta=f"预期进球 {result['exp_goals_a']:.2f}")
+            st.metric(f"{home} Win", f"{result['win_a']*100:.1f}%", 
+                     delta=f"xG: {result['exp_goals_a']:.2f}")
         with prob_cols[1]:
-            st.metric("平局 (加时/点球)", f"{result['draw']*100:.1f}%")
+            st.metric("Draw (ET/Pens)", f"{result['draw']*100:.1f}%")
         with prob_cols[2]:
-            st.metric(f"{away} 获胜", f"{result['win_b']*100:.1f}%",
-                     delta=f"预期进球 {result['exp_goals_b']:.2f}")
+            st.metric(f"{away} Win", f"{result['win_b']*100:.1f}%",
+                     delta=f"xG: {result['exp_goals_b']:.2f}")
 
+        # Top scores
         top = result["top_scores"][:5]
-        st.markdown("#### 📊 最可能比分 TOP5")
+        st.markdown("#### 📊 Most Likely Scorelines")
         score_cols = st.columns(5)
         for i, (score, count) in enumerate(top):
             with score_cols[i]:
@@ -422,7 +471,8 @@ def render_match_card(match, teams_db, stadiums_db, match_type_label):
                 </div>
                 """, unsafe_allow_html=True)
 
-        if match_type_label == "🏆 决赛":
+        # Champion prediction for final
+        if match_type_label == "🏆 Final":
             champion = home if result["win_a"] > result["win_b"] else away
             champion_prob = max(result["win_a"], result["win_b"])
             champ_stats = TEAM_STATS.get(champion, {"flag": "🏳️"})
@@ -430,70 +480,78 @@ def render_match_card(match, teams_db, stadiums_db, match_type_label):
             st.markdown(f"""
             <div style="text-align:center; margin-top:1.5rem;">
                 <div class="winner-box">
-                    🏆 2026世界杯冠军预测<br>
+                    🏆 2026 World Cup Champion Prediction<br>
                     <span style="font-size:2rem;">{champ_stats["flag"]} {champion}</span><br>
-                    <span style="font-size:1rem; opacity:0.8;">夺冠概率: {champion_prob*100:.1f}%</span>
+                    <span style="font-size:1rem; opacity:0.8;">Probability: {champion_prob*100:.1f}%</span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
-        if st.button(f"🔄 重新模拟 {match_type_label}", key=f"sim_{match_id}"):
+        if st.button(f"🔄 Re-simulate {match_type_label}", key=f"sim_{match_id}"):
             st.rerun()
 
     elif is_live:
-        st.info("🔴 比赛进行中 - 实时比分来自 worldcup26.ir API")
+        st.info("🔴 Match in progress - Live scores from worldcup26.ir API")
     elif finished:
-        st.success("✅ 比赛已结束")
+        st.success("✅ Match finished")
 
     st.markdown("---")
 
 
 def main():
-    st.markdown('<div class="main-header">🏆 2026 FIFA 世界杯实时预测系统</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">⚽ 集成实时比分 · 天气数据 · 裁判信息 · 蒙特卡洛模拟</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header">🏆 2026 FIFA World Cup Predictor</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">⚽ Real-time Scores · Weather Data · Referee Info · Monte Carlo Simulation</div>', unsafe_allow_html=True)
 
     with st.sidebar:
-        st.markdown("## 📡 系统状态")
+        st.markdown("## 📡 System Status")
 
         health = fetch_wc_api("/health")
-        if health and health.get("status") == "healthy":
-            st.success("✅ worldcup26.ir 连接正常")
-            st.caption(f"API版本: {health.get('version', 'unknown')}")
+        if isinstance(health, dict) and health.get("status") == "healthy":
+            st.success("✅ worldcup26.ir Connected")
+            st.caption(f"API Version: {health.get('version', 'unknown')}")
         else:
-            st.error("❌ worldcup26.ir 连接失败")
-            st.caption("使用内置离线数据")
+            st.warning("⚠️ worldcup26.ir unavailable")
+            st.caption("Using offline data mode")
 
         if OPENWEATHER_API_KEY:
-            st.success("✅ OpenWeather API 已配置")
+            st.success("✅ OpenWeather API Configured")
         else:
-            st.warning("⚠️ 天气 API 未配置")
-            st.caption("在 Streamlit Secrets 添加 OPENWEATHER_API_KEY")
+            st.warning("⚠️ Weather API not configured")
+            st.caption("Add OPENWEATHER_API_KEY in Streamlit Secrets")
 
         st.markdown("---")
 
-        st.markdown("### 🔄 数据刷新")
-        if st.button("🔄 立即刷新所有数据"):
+        st.markdown("### 🔄 Refresh Data")
+        if st.button("🔄 Refresh All Data"):
             st.cache_data.clear()
             st.rerun()
 
         st.markdown("---")
 
-        st.markdown("### 📅 赛程")
+        st.markdown("### 📅 Schedule")
         st.info("""
-        🥉 季军赛
-        7月18日 15:00
+        🥉 Third Place
+        July 18, 15:00 UTC
         Hard Rock Stadium, Miami
 
-        🏆 决赛
-        7月19日 15:00
+        🏆 Final
+        July 19, 15:00 UTC
         MetLife Stadium, New Jersey
         """)
 
         st.markdown("---")
-        st.markdown("### 📝 关于")
-        st.caption("数据来源: worldcup26.ir | OpenWeatherMap | FIFA官方")
+        st.markdown("### 📝 About")
+        st.caption("""
+        Data Sources:
+        • worldcup26.ir (match data)
+        • OpenWeatherMap (weather)
+        • FIFA Official (referees)
 
-    tab1, tab2, tab3 = st.tabs(["🔮 比赛预测", "📊 数据分析", "⚙️ 系统信息"])
+        Model: Monte Carlo (20,000 sims)
+        with dynamic situational weights
+        """)
+
+    tab1, tab2, tab3 = st.tabs(["🔮 Match Predictions", "📊 Team Analysis", "⚙️ System Info"])
 
     with tab1:
         knockout = get_knockout_matches()
@@ -501,21 +559,44 @@ def main():
         stadiums_db = get_all_stadiums()
 
         if not knockout:
-            st.warning("⚠️ 无法获取淘汰赛数据，请检查 API 连接或稍后重试")
+            st.warning("⚠️ Cannot fetch knockout data. API may require authentication or be unavailable.")
+            st.info("💡 Using manual mode with built-in team data.")
 
-            st.markdown("### 🎯 手动选择模式")
+            st.markdown("### 🎯 Manual Selection Mode")
             all_teams = list(TEAM_STATS.keys())
 
             c1, c2 = st.columns(2)
             with c1:
-                home = st.selectbox("球队 A", all_teams, key="manual_home")
+                home = st.selectbox("Team A", all_teams, key="manual_home")
             with c2:
-                away = st.selectbox("球队 B", [t for t in all_teams if t != home], key="manual_away")
+                away = st.selectbox("Team B", [t for t in all_teams if t != home], key="manual_away")
 
-            if st.button("开始预测"):
-                predictor = MatchPredictor(home, away)
+            # Manual weather selection
+            weather_option = st.selectbox("Weather Condition", [
+                "Clear (22°C)", "Hot (35°C)", "Cold (5°C)", "Rainy (18°C)", "Windy (20°C)"
+            ])
+
+            weather_map = {
+                "Clear (22°C)": {"temperature": 22, "humidity": 50, "wind_speed": 5, "weather_main": "Clear"},
+                "Hot (35°C)": {"temperature": 35, "humidity": 60, "wind_speed": 8, "weather_main": "Clear"},
+                "Cold (5°C)": {"temperature": 5, "humidity": 70, "wind_speed": 10, "weather_main": "Clouds"},
+                "Rainy (18°C)": {"temperature": 18, "humidity": 90, "wind_speed": 12, "weather_main": "Rain"},
+                "Windy (20°C)": {"temperature": 20, "humidity": 55, "wind_speed": 20, "weather_main": "Clouds"},
+            }
+
+            if st.button("Run Prediction"):
+                predictor = MatchPredictor(home, away, weather_map[weather_option], {})
                 result = predictor.simulate(20000)
-                st.write(f"预测: {home} {result['exp_goals_a']:.1f} - {result['exp_goals_b']:.1f} {away}")
+
+                st.success(f"### Prediction: {home} {result['exp_goals_a']:.1f} - {result['exp_goals_b']:.1f} {away}")
+
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.metric(f"{home} Win", f"{result['win_a']*100:.1f}%")
+                with c2:
+                    st.metric("Draw", f"{result['draw']*100:.1f}%")
+                with c3:
+                    st.metric(f"{away} Win", f"{result['win_b']*100:.1f}%")
             return
 
         sf_matches = [m for m in knockout if m.get("type") == "sf"]
@@ -523,7 +604,7 @@ def main():
         final_match = next((m for m in knockout if m.get("type") == "final"), None)
 
         if sf_matches:
-            st.markdown("### ⚔️ 半决赛")
+            st.markdown("### ⚔️ Semi-Finals")
             sf_cols = st.columns(len(sf_matches))
             for i, match in enumerate(sf_matches):
                 with sf_cols[i]:
@@ -532,7 +613,7 @@ def main():
                     hs = match.get("home_score", "0")
                     as_ = match.get("away_score", "0")
                     status = match.get("time_elapsed", "notstarted")
-                    finished = match.get("finished", "FALSE") == "TRUE"
+                    finished = str(match.get("finished", "FALSE")).upper() == "TRUE"
 
                     hf = TEAM_STATS.get(home, {}).get("flag", "🏳️")
                     af = TEAM_STATS.get(away, {}).get("flag", "🏳️")
@@ -547,23 +628,23 @@ def main():
                     """, unsafe_allow_html=True)
 
         if third_match:
-            st.markdown("### 🥉 季军赛")
-            render_match_card(third_match, teams_db, stadiums_db, "🥉 季军赛")
+            st.markdown("### 🥉 Third Place Match")
+            render_match_card(third_match, teams_db, stadiums_db, "🥉 Third Place")
 
         if final_match:
-            st.markdown("### 🏆 决赛")
-            render_match_card(final_match, teams_db, stadiums_db, "🏆 决赛")
+            st.markdown("### 🏆 Final")
+            render_match_card(final_match, teams_db, stadiums_db, "🏆 Final")
 
     with tab2:
-        st.markdown("## 📊 球队数据分析")
+        st.markdown("## 📊 Team Data Analysis")
 
         all_teams = list(TEAM_STATS.keys())
-        selected = st.multiselect("选择球队对比", all_teams, default=all_teams[:4])
+        selected = st.multiselect("Select teams to compare", all_teams, default=all_teams[:4])
 
         if selected:
             import plotly.graph_objects as go
 
-            categories = ["进攻", "防守", "中场", "状态", "FIFA排名(反)"]
+            categories = ["Attack", "Defense", "Midfield", "Form", "FIFA Rank (inv)"]
             fig = go.Figure()
             colors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c"]
 
@@ -588,75 +669,86 @@ def main():
 
             fig.update_layout(
                 polar=dict(radialaxis=dict(visible=True, range=[60, 100])),
-                showlegend=True, title="球队战力雷达图", height=500
+                showlegend=True, title="Team Strength Radar Chart", height=500
             )
             st.plotly_chart(fig, use_container_width=True)
 
-            st.markdown("### 📋 球队详细数据")
+            st.markdown("### 📋 Detailed Team Data")
             df_data = []
             for name in selected:
                 t = TEAM_STATS.get(name, {})
                 overall = (t.get("attack", 0) + t.get("defense", 0) + t.get("midfield", 0)) / 3
                 df_data.append({
-                    "球队": f"{t.get('flag', '🏳️')} {name}",
-                    "进攻": t.get("attack", 0),
-                    "防守": t.get("defense", 0),
-                    "中场": t.get("midfield", 0),
-                    "状态": f"{t.get('form', 0)*100:.0f}",
-                    "世界杯冠军": t.get("titles", 0),
-                    "综合评分": f"{overall:.1f}"
+                    "Team": f"{t.get('flag', '🏳️')} {name}",
+                    "Attack": t.get("attack", 0),
+                    "Defense": t.get("defense", 0),
+                    "Midfield": t.get("midfield", 0),
+                    "Form": f"{t.get('form', 0)*100:.0f}",
+                    "WC Titles": t.get("titles", 0),
+                    "Overall": f"{overall:.1f}"
                 })
             st.dataframe(pd.DataFrame(df_data), use_container_width=True)
 
     with tab3:
-        st.markdown("## ⚙️ 系统信息")
+        st.markdown("## ⚙️ System Information")
 
-        st.markdown("### 🔌 API 状态")
+        st.markdown("### 🔌 API Status")
 
         api_col1, api_col2 = st.columns(2)
         with api_col1:
             st.markdown("**worldcup26.ir**")
             health = fetch_wc_api("/health")
-            if health and health.get("status") == "healthy":
-                st.success("✅ 正常")
+            if isinstance(health, dict) and health.get("status") == "healthy":
+                st.success("✅ Healthy")
                 st.json(health)
             else:
-                st.error("❌ 异常")
+                st.error("❌ Unavailable")
                 st.write(health)
 
         with api_col2:
             st.markdown("**OpenWeatherMap**")
             if OPENWEATHER_API_KEY:
-                st.success("✅ API Key 已配置")
-                st.caption("Key 前8位: " + OPENWEATHER_API_KEY[:8] + "...")
+                st.success("✅ API Key configured")
+                st.caption("Key prefix: " + OPENWEATHER_API_KEY[:8] + "...")
             else:
-                st.error("❌ 未配置")
-                st.caption("在 Streamlit Secrets 添加 OPENWEATHER_API_KEY")
+                st.error("❌ Not configured")
+                st.caption("Add OPENWEATHER_API_KEY in Streamlit Secrets")
 
         st.markdown("---")
 
-        st.markdown("### 📁 项目文件")
+        st.markdown("### 📁 Project Files")
         files = {
-            "app.py": "主应用代码",
-            "requirements.txt": "Python 依赖",
-            ".streamlit/config.toml": "Streamlit 主题配置",
-            ".gitignore": "Git 忽略规则"
+            "app.py": "Main application",
+            "requirements.txt": "Python dependencies",
+            ".streamlit/config.toml": "Streamlit theme config",
+            ".gitignore": "Git ignore rules"
         }
         for f, desc in files.items():
             st.write(f"📄 `{f}` - {desc}")
 
         st.markdown("---")
 
-        st.markdown("### 🚀 部署信息")
+        st.markdown("### 🚀 Deployment Guide")
         st.info("""
-        **部署步骤:**
-        1. 在 GitHub 创建公开仓库 `wc2026-predictor`
-        2. 上传所有项目文件
-        3. 访问 share.streamlit.io 用 GitHub 登录
-        4. 点击 New app → 选择仓库 → 主文件填 `app.py`
-        5. Settings → Secrets 添加 OPENWEATHER_API_KEY
-        6. 点击 Deploy!
+        **Steps:**
+        1. Create public GitHub repo `wc2026-predictor`
+        2. Upload all project files
+        3. Go to share.streamlit.io → Sign in with GitHub
+        4. Click New app → Select repo → Main file: `app.py`
+        5. Settings → Secrets → Add OPENWEATHER_API_KEY
+        6. Click Deploy!
         """)
+
+        st.markdown("### 📝 How to Update Referee Data")
+        st.code("""
+# 1. Edit REFEREE_DATA in app.py
+# 2. Commit and push
+# 3. Streamlit Cloud auto-redeploys
+
+git add app.py
+git commit -m "Update referee: Final - Vinčić, 3rd - Valenzuela"
+git push origin main
+        "", language="bash")
 
 if __name__ == "__main__":
     main()
