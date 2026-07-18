@@ -1,36 +1,78 @@
-# wc2026-predictor
-2026 FIFA World Cup Final &amp; Third Place Match Predictor
 # 🏆 2026 FIFA World Cup Predictor
 
-基于蒙特卡洛模拟的2026世界杯季军赛和决赛预测系统。
+基于蒙特卡洛模拟的2026世界杯季军赛和决赛预测系统，集成实时比分、天气数据和裁判信息。
 
-## 🚀 快速部署到 Streamlit Community Cloud
+## 🚀 快速部署
 
-### 步骤 1: 创建 GitHub 仓库
-1. 在 GitHub 上创建新仓库，例如 `wc2026-predictor`
-2. 将上述所有文件上传到仓库根目录
+### 1. 创建 GitHub 仓库
+1. 在 GitHub 创建公开仓库 `wc2026-predictor`
+2. 上传本项目的所有文件
 
-### 步骤 2: 部署到 Streamlit Cloud
+### 2. 部署到 Streamlit Cloud
 1. 访问 [share.streamlit.io](https://share.streamlit.io)
-2. 使用 GitHub 账号登录
-3. 点击 **"New app"**
-4. 选择你的仓库 `wc2026-predictor`
-5. 主文件路径填写 `app.py`
-6. 点击 **"Deploy!"**
+2. 用 GitHub 登录 → 点击 **New app**
+3. 选择仓库 `wc2026-predictor`
+4. 主文件路径填 `app.py`
+5. 点击 **Deploy!**
 
-### 步骤 3: 完成！
-- 应用会自动构建并部署
-- 获得一个免费的可分享链接，例如：`https://wc2026-predictor-xxx.streamlit.app`
+### 3. 配置 API Key（天气数据）
+1. 访问 [openweathermap.org/api](https://openweathermap.org/api) 注册免费账号
+2. 获取 API Key
+3. 在 Streamlit Cloud 后台：
+   - 进入你的 App → **Settings** → **Secrets**
+   - 添加：`OPENWEATHER_API_KEY = "你的APIKey"`
+
+## 📁 文件结构
+
+```
+wc2026-predictor/
+├── app.py                    # 主应用
+├── requirements.txt          # Python依赖
+├── .gitignore               # Git忽略规则
+├── .streamlit/
+│   └── config.toml          # Streamlit主题配置
+├── .github/
+│   └── workflows/
+│       └── deploy.yml        # CI测试
+└── README.md                 # 本文件
+```
 
 ## 🎯 功能特性
-- ⚽ 半决赛、季军赛、决赛全流程模拟
-- 📊 蒙特卡洛模拟（1000-50000次）
-- 📈 比分概率分布可视化
-- 🎯 球队战力雷达图对比
-- 🏆 冠军预测与概率分析
-- 🔄 实时重新模拟
 
-## 📝 数据来源
-- FIFA 世界排名
-- 球队近期状态
-- 历史交锋数据
+- ⚽ **实时比分**：集成 worldcup26.ir API
+- 🌤️ **天气数据**：OpenWeatherMap 实时天气
+- 👨‍⚖️ **裁判信息**：内置数据库，赛前更新
+- 🔮 **蒙特卡洛模拟**：20,000次模拟预测
+- 📊 **数据可视化**：Plotly 雷达图、比分分布
+- 🔄 **一键重算**：实时重新模拟
+
+## 📝 赛前更新裁判数据
+
+FIFA 公布裁判组后，修改 `app.py` 中的 `REFEREE_DATA`：
+
+```python
+REFEREE_DATA = {
+    "104": {  # 决赛
+        "main": {"name": "Szymon Marciniak", "country": "波兰", "style": "严格", "cards_per_game": 4.2},
+        "var": {"name": "Tomasz Kwiatkowski", "country": "波兰"},
+        ...
+    }
+}
+```
+
+然后 `git push`，Streamlit Cloud 会自动重新部署。
+
+## 📅 关键比赛
+
+| 比赛 | 日期 | 时间 | 球场 |
+|------|------|------|------|
+| 🥉 季军赛 | 7月18日 | 15:00 UTC | Hard Rock Stadium, Miami |
+| 🏆 决赛 | 7月19日 | 15:00 UTC | MetLife Stadium, New Jersey |
+
+## ⚠️ 免责声明
+
+本系统仅供娱乐参考，预测结果不代表实际比赛结果。
+
+## 📄 License
+
+MIT
